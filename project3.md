@@ -233,7 +233,7 @@ Create `routes` directory:
 ---
 
 
-## Backend Configuration: MongoDB
+## Step 4 - Backend Configuration: MongoDB
 
 ### Setup MongoDB Account, Database, & Collection
 - Visit [MongoDB Atlas](https://www.mongodb.com/atlas-signup-from-mlab) to sign-up/login
@@ -322,3 +322,380 @@ Create `routes` directory:
 
 
 ### Backend Testing with Postman
+
+---
+
+
+
+## Step 5 - Frontend Creation
+
+### Create & Configure ReactJS App
+- Create react app named `client` in application root directory:
+    ```
+    npx create-react-app client
+    ```
+- Install `concurrently` dependency package for running multiple commands simultaneously in terminal:
+    ```
+    npm install concurrently --save-dev
+    ```
+- Install `nodemon` dependency package for run and monitor node server automatically:
+    ```
+    npm install nodemon --save-dev
+    ```
+- Edit `package.json` file located in application root directory:
+    ```
+    nano package.json
+    ```
+- Replace the `scripts` key-value pair entry with the following code:
+    ```
+    "scripts": {
+        "start": "node index.js",
+        "start-watch": "nodemon index.js",
+        "dev": "concurrently \"npm run start-watch\" \"cd client && npm start\""
+    },
+- Save and exit editor with `CTRL/CMD + X`, then `Y`, then `ENTER`
+- Next, configure Proxy in `package.json` file located in `client` directory:
+    ```
+    nano client/package.json
+    ```
+- Add key-value pair `"proxy": "http://localhost:5000"` to enable access to application in browser without using `http://localhost:5000/api/todos`
+- Start app in `dev` mode from application root directory:
+    ```
+    npm run dev
+    ```
+- App now open and runs on port 3000. Hence, open port 3000 in EC2 instance:
+![Open port 3000](./images/ec2-open-port-3000.png)
+![Running on 3000](./images/react-run-dev-on-3000.png)
+![Running in browser](./images/react-run-in-browser.png)
+
+
+### Create React Components
+- Navigate to `src` directory within the `client` directory:
+    ```
+    cd client/src
+    ```
+- Create a `components` directory within `src`:
+    ```
+    mkdir components
+    ```
+- Navigate into `components` directory:
+    ```
+    cd components
+    ```
+- Use the `touch` command to create three files within the `components` directory called `Input.js`, `ListTodo.js`, and `Todo.js`:
+    ```
+    touch Input.js ListTodo.js Todo.js
+    ```
+- Edit `Input.js`
+    ```
+    nano Input.js
+    ```
+- Insert the following code:
+    ```
+    import React, { Component } from 'react';
+    import axios from 'axios';
+
+    class Input extends Component {
+        state = {
+            action: ""
+        }
+        
+        addTodo = () => {
+            const task = {action: this.state.action}
+
+            if(task.action && task.action.length > 0){
+                axios.post('/api/todos', task)
+                .then(res => {
+                    if(res.data){
+                        this.props.getTodos();
+                        this.setState({action: ""})
+                    }
+                })
+                .catch(err => console.log(err))
+            }else {
+                console.log('input field required')
+            }
+        }
+
+        handleChange = (e) => {
+            this.setState({
+                action: e.target.value
+            })
+        }
+
+        render() {
+            let { action } = this.state;
+            return (
+                <div>
+                    <input type="text" onChange={this.handleChange} value={action} />
+                    <button onClick={this.addTodo}>add todo</button>
+                </div>
+            )
+        }
+    }
+
+    export default Input
+    ```
+- Save and exit editor with `CTRL/CMD + X`, then `Y`, then `ENTER`
+- Navigate back to `client` directory:
+    ```
+    cd ../..
+    ```
+- Install Axios:
+    ```
+    npm install axios
+    ```
+- Navigate to `components` directory:
+    ```
+    cd src/components
+    ```
+- Edit `ListTodo.js`
+    ```
+    nano ListTodo.js
+    ```
+- Insert the following code:
+    ```
+    import React from 'react';
+
+    const ListTodo = ({todos, deleteTodo}) => {
+        return (
+            <ul>
+                {
+                    todos && todos.length > 0 ? (
+                        todos.map(todo => {
+                            return (
+                                <li key={todo._id} onClick={() => deleteTodo(todo._id)}>{todo.action}</li>
+                            )
+                        })
+                    ) : (
+                        <li>No todo(s) left</li>
+                    )
+                }
+            </ul>
+        )
+    }
+
+    export default ListTodo
+    ```
+- Save and exit editor with `CTRL/CMD + X`, then `Y`, then `ENTER`
+- Edit `Todo.js`
+    ```
+    nano Todo.js
+    ```
+- Insert the following code:
+    ```
+    import React, {Component} from 'react';
+    import axios from 'axios';
+
+    import Input from './Input';
+    import ListTodo from './ListTodo';
+
+    class Todo extends Component {
+        state = {
+            todos: []
+        }
+
+        componentDidMount(){
+            this.getTodos();
+        }
+
+        getTodos = () => {
+            axios.get('/api/todos')
+            .then(res => {
+                if (res.data){
+                    this.setState({
+                        todos: res.data
+                    })
+                }
+            })
+            .catch(err => console.log(err))
+        }
+
+        deleteTodo = (id) => {
+            axios.delete(`/api/todos/${id}`)
+            .then(res => {
+                if(res.data){
+                    this.getTodos()
+                }
+            })
+            .catch(err => console.log(err))
+        }
+
+        render() {
+            let {todos} = this.state;
+
+            return(
+                <div>
+                    <h1>My Todo(s)</h1>
+                    <Input getTodos={this.getTodos}/>
+                    <ListTodo todos={todos} deleteTodo={this.deleteTodo}/>
+                </div>
+            )
+        }
+    }
+
+    export default Todo;
+    ```
+- Save and exit editor with `CTRL/CMD + X`, then `Y`, then `ENTER`
+
+
+### Adjust React Code
+- Navigate to `src` folder:
+    ```
+    cd ..
+    ```
+- Edit `App.js` file:
+    ```
+    nano App.js
+    ```
+- Replace code with the following:
+    ```
+    import React from 'react';
+
+    import Todo from './components/Todo';
+    import './App.css';
+
+    const App = () => {
+        return (
+            <div classname="App">
+                <Todo />
+            </div>
+        );
+    }
+
+    export default App;
+    ```
+- Save and exit editor with `CTRL/CMD + X`, then `Y`, then `ENTER`
+- Edit `App.css` file:
+    ```
+    nano App.css
+    ```
+- Replace code with the following:
+    ```
+    .App {
+        text-align: center;
+        font-size: calc(10px + 2vmin);
+        width: 60%;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    input {
+        height: 40px;
+        width: 50%;
+        border: none;
+        border-bottom: 2px #101113 solid;
+        background: none;
+        font-size: 1.5rem;
+        color: #787a80;
+    }
+
+    input:focus {
+        outline: none;
+    }
+
+    button {
+        width: 25%;
+        height: 45px;
+        border: none;
+        margin-left: 10px;
+        font-size: 25px;
+        background: #101113;
+        border-radius: 5px;
+        color: #787a80;
+        cursor: pointer;
+    }
+
+    button:focus {
+        outline: none;
+    }
+
+    ul {
+        list-style: none;
+        text-align: left;
+        padding: 15px;
+        background: #171a1f;
+        border-radius: 5px;
+    }
+
+    li {
+        padding: 15px;
+        font-size: 1.5rem;
+        margin-bottom: 15px;
+        background: #282c34;
+        border-radius: 5px;
+        overflow-wrap: break-word;
+        cursor: pointer;
+    }
+
+    @media only screen and (min-width: 300px) {
+        .App {
+            width: 80%;
+        }
+
+        input {
+            width: 100%
+        }
+
+        button {
+            width: 100%;
+            margin-top: 15px;
+            margin-left: 0;
+        }
+    }
+
+    @media only screen and (min-width: 640px) {
+        .App {
+            width: 60%;
+        }
+
+        input {
+            width: 50%;
+        }
+
+        button {
+            width: 30%;
+            margin-left: 10px;
+            margin-top: 0;
+        }
+    }
+    ```
+- Save and exit editor with `CTRL/CMD + X`, then `Y`, then `ENTER`
+- Edit `index.css` file:
+    ```
+    nano index.css
+    ```
+- Replace code with the following:
+    ```
+    body {
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+        "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+        sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        box-sizing: border-box;
+        background-color: #282c34;
+        color: #787a80;
+    }
+
+    code {
+        font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",monospace;
+    }
+    ```
+- Save and exit editor with `CTRL/CMD + X`, then `Y`, then `ENTER`
+- Navigate to application root directory `todo`:
+    ```
+    cd ../..
+    ```
+- Start app in `dev` mode from application root directory:
+    ```
+    npm run dev
+    ```
+- View app in browser on port 3000 `18.215.153.64:3000`
+![Todo App No Task](./images/react-todo-app1.png)
+![Todo App with Tasks](./images/react-todo-app2.png)
+
+
+---
